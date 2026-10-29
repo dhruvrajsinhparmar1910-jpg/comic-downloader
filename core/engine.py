@@ -7,7 +7,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 from urllib.parse import urlparse
 from xml.sax.saxutils import escape as xml_escape
 
@@ -71,16 +71,23 @@ class Engine:
 
     # ------------------------------------------------------------------ queue
 
-    def run(self, items: list[JobItem]) -> None:
+    def run(self, items: Union[list[JobItem], Callable[[], Optional[JobItem]]]) -> None:
+        """Process queued items one at a time. `items` may be a list or a callable returning the next item."""
+        if isinstance(items, list):
+            pending = iter([i for i in items if i.status == QUEUED])
+            next_item = lambda: next(pending, None)  # noqa: E731
+        else:
+            next_item = items
         try:
             first = True
-            for item in items:
-                if self.stop.is_set():
+            while not self.stop.is_set():
+                item = next_item()
+                if item is None:
                     break
-                if item.status not in (QUEUED, ERROR, STOPPED):
-                    continue
                 if not first:
                     self._delay_quiet()
+                    if self.stop.is_set():
+                        break
                 first = False
                 self.run_item(item)
         finally:
@@ -95,7 +102,7 @@ class Engine:
         item.status = RUNNING
         item.output = ""
         self._progress(item, None, "starting")
-        self.log(f"▶ {item.url}  [mode={item.mode}, format={item.fmt}, series={item.whole_series}]")
+        self.log(f"> {item.url}  [mode={item.mode}, format={item.fmt}, series={item.whole_series}]")
         try:
             ebook.check_drm(item.url)
             if self.session is None:
@@ -105,20 +112,20 @@ class Engine:
             item.status = DONE
             item.output = str(outputs[0].parent if len(outputs) > 1 else outputs[0])
             self._progress(item, 1.0, f"done - {len(outputs)} file(s)")
-            self.log(f"✔ saved to {item.output}")
+            self.log(f"OK - saved to {item.output}")
         except StopRequested:
             item.status = STOPPED
             self._progress(item, 0.0, "stopped")
-            self.log("■ stopped")
+            self.log("Stopped.")
         except ebook.DrmProtectedError as e:
             item.status = ERROR
             self._progress(item, 0.0, "DRM-protected - skipped")
-            self.log(f"✖ {e}")
+            self.log(f"ERROR: {e}")
         except Exception as e:
             item.status = ERROR
             msg = str(e).splitlines()[0] if str(e) else type(e).__name__
             self._progress(item, 0.0, f"error: {msg[:120]}")
-            self.log(f"✖ {msg}")
+            self.log(f"ERROR: {msg}")
         finally:
             exporter.remove_tree(self._tmp_dir(item))
 
@@ -284,7 +291,7 @@ class Engine:
             self._progress(item, None, f"{label}: exporting {fmt.upper()}")
             out = exporter.export_images(res.files, fmt, dest)
             outputs.append(out)
-            self.log(f"  → {out}")
+            self.log(f"  -> {out}")
             exporter.remove_tree(tmp / f"{idx:04d}")
         if not outputs:
             raise RuntimeError("Nothing was downloaded.")
@@ -353,7 +360,7 @@ class Engine:
             out = exporter.export_epub(book, dest)
         else:
             out = exporter.export_text_pdf(book, dest, self.session, tmp)
-        self.log(f"  → {out} ({len(book.chapters)} chapters)")
+        self.log(f"  -> {out} ({len(book.chapters)} chapters)")
         return out
 
 
