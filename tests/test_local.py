@@ -32,9 +32,9 @@ def teardown_module(_=None):
     _state["server"].shutdown()
 
 
-def run(url: str, mode: str, fmt: str, series: bool = False, name: str = "x") -> tuple[JobItem, Path]:
+def run(url: str, mode: str, fmt: str, series: bool = False, name: str = "x", **settings) -> tuple[JobItem, Path]:
     out = OUT / "downloads" / name
-    s = Settings(output_dir=str(out), delay_min=0.1, delay_max=0.2, max_chapters=10)
+    s = Settings(**{"output_dir": str(out), "delay_min": 0.1, "delay_max": 0.2, "max_chapters": 10, **settings})
     item = JobItem(url=_state["base"] + url if url.startswith("/") else url, mode=mode, fmt=fmt, whole_series=series)
     logs: list[str] = []
     Engine(s, logs.append, stop=threading.Event()).run([item])
@@ -112,6 +112,22 @@ def test_scanned_book_pdf():
     item, out = run("/book/scan.html", "ebook", "epub", name="scan")
     assert item.status == DONE, item.message
     assert len(list(out.glob("*.pdf"))) == 1
+
+
+def test_max_chapters_and_profile():
+    item, out = run("/comic/ch1.html", "comic", "folder", series=True, name="profile", max_chapters=2,
+                    use_profile=True, profile_dir=str(OUT / "profile"))
+    assert item.status == DONE, item.message
+    chapters = sorted(p.name for p in (out / "Space Cadet Comics").iterdir())
+    assert chapters == ["Chapter 001", "Chapter 002"]
+    assert (OUT / "profile").is_dir() and any((OUT / "profile").iterdir())
+
+
+def test_series_title():
+    from core.series import series_title
+    assert series_title("Read One Piece Chapter 1000 Online - MangaSite", "x") == "One Piece"
+    assert series_title("Batman #12 | ReadComics", "x") == "Batman"
+    assert series_title("", "host") == "host"
 
 
 def test_drm_skipped():

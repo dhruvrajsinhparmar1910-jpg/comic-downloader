@@ -69,7 +69,8 @@ def series_title(page_title: str, fallback: str) -> str:
     """Strip "Chapter 12" / site-name parts from a chapter title to get the series name."""
     parts = [p.strip() for p in re.split(r"\s+[|\-–—:»]\s+|\s*\|\s*", page_title or "") if p.strip()]
     for p in parts:
-        cleaned = _CHAPTER_RE.split(p)[0].strip(" -–—:,#")
+        cleaned = re.sub(r"\s#\d.*$", "", _CHAPTER_RE.split(p)[0]).strip(" -–—:,#")
+        cleaned = re.sub(r"(?i)^read\s+|\s+(read\s+)?(online|for free|free)$", "", cleaned).strip()
         if cleaned and not re.fullmatch(r"(?i)read|online|free|manga|comic|chapter", cleaned):
             return cleaned
     return fallback

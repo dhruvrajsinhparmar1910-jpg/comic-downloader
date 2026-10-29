@@ -8,7 +8,6 @@ import subprocess
 import sys
 import threading
 import time
-from pathlib import Path
 from typing import Optional
 
 import flet as ft
@@ -103,7 +102,7 @@ class App:
         self.events: "queue.Queue[tuple]" = queue.Queue()
         self.stop_event = threading.Event()
         self.worker: Optional[threading.Thread] = None
-        self.installing = False
+        self.installing = True  # until the first-run browser check has finished
         self.lock = threading.Lock()
         self.picker = ft.FilePicker()
         self._build()
@@ -294,7 +293,7 @@ class App:
         if self.worker and self.worker.is_alive():
             return
         if self.installing:
-            self.log("Please wait until the browser download has finished.")
+            self.log("Please wait - checking/downloading the browser.")
             return
         self._save_settings()
         if not self._next_item():
@@ -349,8 +348,8 @@ class App:
 
     def _check_browser(self) -> None:
         if browser.chromium_installed():
+            self.installing = False
             return
-        self.installing = True
         self.events.put(("banner", "Downloading the Chromium browser (first run only)…", None))
         ok = browser.install_chromium(
             self.log, lambda f: self.events.put(("banner", f"Downloading Chromium… {int(f * 100)}%", f)))

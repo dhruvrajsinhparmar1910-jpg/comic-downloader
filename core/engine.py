@@ -136,7 +136,6 @@ class Engine:
     # ------------------------------------------------------------------ dispatch
 
     def process(self, item: JobItem) -> list[Path]:
-        s = self.settings
         page = self.session.new_page()
         net = scraper.NetworkCollector(page)
         try:
