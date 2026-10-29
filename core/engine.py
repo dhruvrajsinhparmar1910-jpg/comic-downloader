@@ -1,8 +1,10 @@
 """Runs queue items: detects the page type and drives scraping + export."""
 from __future__ import annotations
 
+import os
 import re
 import threading
+import traceback
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -123,6 +125,8 @@ class Engine:
             self.log(f"ERROR: {e}")
         except Exception as e:
             item.status = ERROR
+            if os.environ.get("CD_DEBUG"):
+                self.log(traceback.format_exc())
             msg = str(e).splitlines()[0] if str(e) else type(e).__name__
             self._progress(item, 0.0, f"error: {msg[:120]}")
             self.log(f"ERROR: {msg}")

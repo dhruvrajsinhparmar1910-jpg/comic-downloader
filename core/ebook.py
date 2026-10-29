@@ -225,7 +225,10 @@ def extract_text_chapter(html_text: str, url: str) -> Optional[TextChapter]:
 
     doc = lhtml.fromstring(html_text)
     page_title = (doc.findtext(".//title") or "").strip()
-    meta = trafilatura.extract_metadata(html_text, default_url=url)
+    try:
+        meta = trafilatura.extract_metadata(html_text, default_url=url)
+    except Exception:  # metadata is optional
+        meta = None
     title = ""
     first_heading = next((h for h in body.iter("h1", "h2") if h.text_content().strip()), None)
     if first_heading is not None:
