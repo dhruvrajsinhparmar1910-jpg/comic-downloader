@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+build/
+dist/
+*.spec
+settings.json
+ms-playwright/
+tests/output/

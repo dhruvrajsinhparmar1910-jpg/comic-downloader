@@ -1,0 +1,7 @@
+playwright==1.64.1
+flet[all]==1.0.5
+pillow>=11.3
+img2pdf>=0.5
+trafilatura>=2.0
+lxml_html_clean>=0.4
+ebooklib>=0.18
