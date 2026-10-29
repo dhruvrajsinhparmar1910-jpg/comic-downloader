@@ -1,5 +1,7 @@
 # Real-site smoke test for the built exe: downloads one public-domain comic from each site
 # and fails if a site yields no saved images.
+# A site that only serves a bot check (e.g. Cloudflare "Just a moment...", which blocks
+# datacenter IPs like CI runners) is reported as skipped with a warning instead.
 param(
     [string]$Exe = "dist\ComicDownloader.exe",
     [string]$WorkDir = "smoke"
@@ -14,7 +16,7 @@ $UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like
 function Invoke-Exe([string[]]$ArgList, [string]$Log) {
     $quoted = $ArgList | ForEach-Object { '"' + $_ + '"' }
     $p = Start-Process -FilePath $Exe -ArgumentList ($quoted + @('--log', "`"$Log`"")) -Wait -PassThru -NoNewWindow
-    if (Test-Path $Log) { Get-Content $Log | ForEach-Object { Write-Host "    $_" } }
+    if (Test-Path $Log) { Get-Content $Log -Encoding utf8 | ForEach-Object { Write-Host "    $_" } }
     return $p.ExitCode
 }
 
@@ -52,6 +54,8 @@ $sites = [ordered]@{
 }
 
 $failed = @()
+$passed = @()
+$skipped = @()
 foreach ($name in $sites.Keys) {
     $site = $sites[$name]
     Write-Host "== $name"
@@ -60,6 +64,7 @@ foreach ($name in $sites.Keys) {
     $urls = @(@($urls | Select-Object -First 3) + @($site.Fallback) | Select-Object -Unique)
     Write-Host "  candidates: $($urls -join ', ')"
     $ok = $false
+    $allBlocked = $true
     $i = 0
     foreach ($url in $urls) {
         $i++
@@ -73,9 +78,18 @@ foreach ($name in $sites.Keys) {
             $ok = $true
             break
         }
+        $log = Join-Path $WorkDir "$name-$i.log"
+        $blocked = (Test-Path $log) -and (Select-String -Path $log -Pattern 'showing a bot check' -Quiet)
+        if (-not $blocked) { $allBlocked = $false }
     }
-    if (-not $ok) { $failed += $name }
+    if ($ok) { $passed += $name }
+    elseif ($allBlocked) {
+        $skipped += $name
+        Write-Host "::warning title=Smoke test skipped::$name served a bot check (Cloudflare) to this runner; no download was possible from CI."
+    }
+    else { $failed += $name }
 }
 
+Write-Host "passed: $($passed -join ', ')  skipped (bot check): $($skipped -join ', ')  failed: $($failed -join ', ')"
 if ($failed.Count -gt 0) { throw "No images saved for: $($failed -join ', ')" }
 Write-Host "Smoke test passed."
