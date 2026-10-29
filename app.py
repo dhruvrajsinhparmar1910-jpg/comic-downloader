@@ -32,10 +32,20 @@ def run_cli(argv: list[str]) -> int:
     ap.add_argument("--max-chapters", type=int)
     ap.add_argument("--out", help="output folder")
     ap.add_argument("--install-browser", action="store_true", help="only download Chromium")
+    ap.add_argument("--log", help="also write the log to this file (the exe has no console)")
     args = ap.parse_args(argv)
 
+    log_file = open(args.log, "a", encoding="utf-8") if args.log else None
+
+    def log(msg: str) -> None:
+        if sys.stdout is not None:
+            print(msg, flush=True)
+        if log_file is not None:
+            log_file.write(msg + "\n")
+            log_file.flush()
+
     if args.install_browser:
-        return 0 if browser.ensure_chromium(print) else 1
+        return 0 if browser.ensure_chromium(log) else 1
     if not args.urls:
         ap.error("no URLs given")
     s = Settings.load()
@@ -45,7 +55,7 @@ def run_cli(argv: list[str]) -> int:
         s.max_chapters = args.max_chapters
     items = [JobItem(url=u, mode=args.mode or s.mode, fmt=args.fmt or s.fmt,
                      whole_series=args.series or s.whole_series) for u in args.urls]
-    Engine(s, print, stop=threading.Event()).run(items)
+    Engine(s, log, stop=threading.Event()).run(items)
     return 0 if all(i.status == DONE for i in items) else 1
 
 

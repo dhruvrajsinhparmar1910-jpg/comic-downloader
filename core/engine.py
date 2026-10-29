@@ -279,6 +279,8 @@ class Engine:
             walker.set_next(series.find_next_chapter(page))
             if not res.files:
                 if idx == 1:
+                    if os.environ.get("CD_DEBUG"):
+                        self._log_page_debug(page, net)
                     raise RuntimeError("No comic images found on this page.")
                 self.log(f"  chapter {idx}: no images found, skipping")
                 continue
@@ -299,6 +301,29 @@ class Engine:
         if not outputs:
             raise RuntimeError("Nothing was downloaded.")
         return outputs
+
+    def _log_page_debug(self, page, net) -> None:
+        """Dump what the page contains, to diagnose sites the capture doesn't handle yet."""
+        try:
+            info = page.evaluate("""() => ({
+                title: document.title, url: location.href,
+                imgs: Array.from(document.images).slice(0, 25).map(i => `${i.naturalWidth}x${i.naturalHeight} ${i.currentSrc || i.src}`),
+                frames: Array.from(document.querySelectorAll('iframe')).map(f => f.src).slice(0, 10),
+                canvases: document.querySelectorAll('canvas').length,
+                links: Array.from(document.querySelectorAll('a[href]')).map(a => `${a.textContent.trim().slice(0, 30)} -> ${a.href}`).slice(0, 60),
+            })""")
+        except Exception as e:
+            self.log(f"  debug: {e}")
+            return
+        self.log(f"  debug: title={info['title']!r} url={info['url']} canvases={info['canvases']}")
+        for line in info["imgs"]:
+            self.log(f"  debug img: {line}")
+        for line in info["frames"]:
+            self.log(f"  debug iframe: {line}")
+        for line in info["links"]:
+            self.log(f"  debug link: {line}")
+        for url in net.order[:25]:
+            self.log(f"  debug net image: {url}")
 
     # ------------------------------------------------------------------ text
 
