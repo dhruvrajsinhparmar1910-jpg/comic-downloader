@@ -219,7 +219,7 @@ def export_text_pdf(book: Book, dest: Path, session, workdir: Path) -> Path:
     workdir.mkdir(parents=True, exist_ok=True)
     src = workdir / "book.html"
     src.write_text(book_html(book), encoding="utf-8")
-    page = session.new_page()
+    page = session.headless_page()
     try:
         page.goto(src.resolve().as_uri(), wait_until="load")
         footer = ("<div style='font-size:8px;width:100%;text-align:center;color:#888'>"

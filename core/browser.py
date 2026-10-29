@@ -115,6 +115,8 @@ class BrowserSession:
         self._pw = None
         self._browser = None
         self.context = None
+        self._pdf_browser = None
+        self._headless = True
         self.user_agent = DEFAULT_UA.format(version="131.0.0.0")
 
     def _launch_kwargs(self, headless: bool) -> dict:
@@ -132,6 +134,7 @@ class BrowserSession:
 
         if headless is None:
             headless = not self.settings.show_browser
+        self._headless = headless
         self._pw = sync_playwright().start()
         kw = self._launch_kwargs(headless)
         ctx_kw = {"viewport": {"width": 1280, "height": 900}, "accept_downloads": True}
@@ -164,8 +167,16 @@ class BrowserSession:
     def new_page(self):
         return self.context.new_page()
 
+    def headless_page(self):
+        """A page in a headless browser (page.pdf() only works headless)."""
+        if not self._headless:
+            if self._pdf_browser is None:
+                self._pdf_browser = self._pw.chromium.launch(**self._launch_kwargs(True))
+            return self._pdf_browser.new_page()
+        return self.new_page()
+
     def close(self) -> None:
-        for obj in (self.context, self._browser):
+        for obj in (self.context, self._browser, self._pdf_browser):
             try:
                 if obj is not None:
                     obj.close()
@@ -176,7 +187,7 @@ class BrowserSession:
                 self._pw.stop()
         except Exception:
             pass
-        self.context = self._browser = self._pw = None
+        self.context = self._browser = self._pdf_browser = self._pw = None
 
     def __enter__(self) -> "BrowserSession":
         return self.start()

@@ -127,6 +127,10 @@ def build_site(root: Path) -> Path:
                                            "<a href='/files/book.epub'>Download EPUB</a> <a href='/read'>Read online</a>"), encoding="utf-8")
     scan = "".join(f"<img src='/img/scan_{p}.jpg' style='width:900px;height:1300px;display:block'>" for p in range(1, 5))
     (book / "scan.html").write_text(_html("Scanned Book - page view", f"{nav}<div>{scan}</div>"), encoding="utf-8")
+    # Bot-check interstitial that clears itself after a moment (like Cloudflare's JS challenge)
+    (comic / "guarded.html").write_text(_html("Just a moment...", "<div id='challenge-stage'>Checking your browser</div>"
+                                              "<script>setTimeout(() => location.replace('/comic/ch3.html'), 2500)</script>"),
+                                        encoding="utf-8")
     (root / "index.html").write_text(_html("Mock site", "<a href='/comic/ch1.html'>comic</a>"), encoding="utf-8")
     return root
 

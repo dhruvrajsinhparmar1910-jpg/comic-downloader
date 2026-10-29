@@ -130,6 +130,24 @@ def test_series_title():
     assert series_title("", "host") == "host"
 
 
+def test_bot_check_waits_until_cleared():
+    item, out = run("/comic/guarded.html", "comic", "cbz", name="guarded")
+    assert item.status == DONE, item.message
+    assert [p.name for p in out.glob("*.cbz")] == ["Space Cadet Comics Chapter 3 - MockComics.cbz"]
+
+
+def test_text_pdf_with_visible_browser_setting():
+    # page.pdf() needs headless Chromium; the session must use a separate headless browser for it
+    from core.browser import BrowserSession
+    from core.exporter import Book, BookChapter, export_text_pdf
+    s = Settings(show_browser=False)
+    with BrowserSession(s, print) as session:
+        session._headless = False  # simulate a visible-browser session without needing a display
+        out = export_text_pdf(Book(title="T", chapters=[BookChapter("C", "<p>hi</p>")]),
+                              OUT / "downloads" / "visible" / "t", session, OUT / "downloads" / "visible" / "tmp")
+        assert out.read_bytes()[:5] == b"%PDF-"
+
+
 def test_drm_skipped():
     item, _ = run("https://read.amazon.com/?asin=B000000", "ebook", "epub", name="drm")
     assert item.status == ERROR and "DRM" in item.message

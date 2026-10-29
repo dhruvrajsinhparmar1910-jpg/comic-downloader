@@ -68,7 +68,50 @@ def goto(page, url: str):
         page.wait_for_load_state("load", timeout=15000)
     except Exception:
         pass
+    if is_bot_check(page):
+        resp = wait_for_bot_check(page) or resp
     return resp
+
+
+class BotCheckError(RuntimeError):
+    pass
+
+
+BOT_CHECK_TITLES = ("just a moment", "attention required", "please wait", "checking your browser",
+                    "verifying you are human", "ddos-guard")
+
+
+def is_bot_check(page) -> bool:
+    try:
+        title = (page.title() or "").strip().lower()
+        if any(title.startswith(t) for t in BOT_CHECK_TITLES):
+            return True
+        return bool(page.query_selector("#challenge-form, #cf-challenge-running, .cf-turnstile, #challenge-stage"))
+    except Exception:
+        return False
+
+
+def wait_for_bot_check(page, timeout: float = 30.0):
+    """Give a Cloudflare-style "checking your browser" page time to finish and redirect.
+
+    Nothing is solved or bypassed here: if the check needs a human, the user is told how to pass it themselves.
+    """
+    last_resp = []
+    page.on("response", lambda r: last_resp.append(r) if r.request.resource_type == "document" else None)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        page.wait_for_timeout(1000)
+        if not is_bot_check(page):
+            try:
+                page.wait_for_load_state("load", timeout=15000)
+            except Exception:
+                pass
+            return last_resp[-1] if last_resp else None
+    raise BotCheckError(
+        "The site is showing a bot check (e.g. Cloudflare 'Just a moment...') that didn't clear. "
+        "Turn on 'Use my Chrome profile', click 'Log in…', pass the check in the browser window, "
+        "close it and try again (or turn on 'Show browser window')."
+    )
 
 
 def wait_network_idle(page, timeout: float = 10.0) -> None:

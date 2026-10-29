@@ -65,7 +65,7 @@ foreach ($name in $sites.Keys) {
         $i++
         $out = Join-Path $WorkDir "$name-$i"
         Write-Host "  -> $url"
-        $code = Invoke-Exe @('--cli', $url, '--mode', 'comic', '--format', 'folder', '--out', $out) (Join-Path $WorkDir "$name-$i.log")
+        $code = Invoke-Exe @('--cli', $url, '--mode', 'comic', '--format', 'folder', '--show-browser', '--out', $out) (Join-Path $WorkDir "$name-$i.log")
         $images = @(Get-ChildItem -Path $out -Recurse -File -Include *.jpg, *.png -ErrorAction SilentlyContinue)
         Write-Host "  exit=$code images=$($images.Count)"
         if ($images.Count -gt 0) {
